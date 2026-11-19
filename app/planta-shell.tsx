@@ -29,21 +29,50 @@ export function PlantaShell({ markup, simulation = false }: PlantaShellProps) {
 
     root.innerHTML = markup
     const scripts = simulation ? simulationScripts : dashboardScripts
+    const loadOnce = new Set(['/planta/sa-data.js', '/planta/world.js', '/planta/scenes.js'])
+    const browserWindow = window as Window & { __plantaScriptLoads?: Map<string, Promise<void>> }
+    const scriptLoads = browserWindow.__plantaScriptLoads ??= new Map<string, Promise<void>>()
 
-    const loadScript = (index: number) => {
-      if (cancelled || index >= scripts.length) return
-      const script = document.createElement('script')
-      script.src = scripts[index]
-      script.dataset.plantaScript = 'true'
-      script.onload = () => loadScript(index + 1)
-      script.onerror = () => console.error(`Não foi possível carregar ${scripts[index]}`)
-      document.body.appendChild(script)
+    const loadScript = (src: string, once: boolean) => {
+      const existingLoad = once ? scriptLoads.get(src) : undefined
+      if (existingLoad) return existingLoad
+
+      const load = new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = src
+        script.dataset.plantaScript = 'true'
+        script.onload = () => {
+          script.remove()
+          resolve()
+        }
+        script.onerror = () => {
+          script.remove()
+          reject(new Error(`Não foi possível carregar ${src}`))
+        }
+        document.body.appendChild(script)
+      })
+
+      if (once) scriptLoads.set(src, load)
+      load.catch(() => {
+        if (once && scriptLoads.get(src) === load) scriptLoads.delete(src)
+      })
+      return load
     }
 
-    loadScript(0)
+    const initialize = async () => {
+      try {
+        for (const src of scripts) {
+          if (cancelled) return
+          await loadScript(src, loadOnce.has(src))
+        }
+      } catch (error) {
+        if (!cancelled) console.error(error)
+      }
+    }
+
+    void initialize()
     return () => {
       cancelled = true
-      document.querySelectorAll('script[data-planta-script]').forEach((script) => script.remove())
       root.replaceChildren()
     }
   }, [markup, simulation])
