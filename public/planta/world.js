@@ -255,7 +255,26 @@ const W = (() => {
     return g;
   }
   const PEOPLE = [];
-  function animPeople(t) { PEOPLE.forEach(p => { const ph = p.userData.ph; p.userData.head.rotation.y = (p.userData.look0 ??= p.userData.head.rotation.y) + Math.sin(t * 0.35 + ph) * 0.18; p.children.forEach(c => { }); }); }
+  function animPeople(t) { PEOPLE.forEach(p => { const ph = p.userData.ph; p.userData.head.rotation.y = (p.userData.look0 ??= p.userData.head.rotation.y) + Math.sin(t * 0.35 + ph) * 0.18; }); }
+  function animatePerson(p, dt) {
+    if (!p || !p.userData.actionMotion) return;
+    const motion = p.userData.actionMotion;
+    motion.elapsed = Math.min(motion.duration, motion.elapsed + dt);
+    const progress = motion.elapsed / motion.duration;
+    const lift = Math.sin(progress * Math.PI);
+    const arm = p.userData.arms[1];
+    const elbow = arm.userData.elbow;
+    arm.rotation.x = motion.armX + lift * 0.78;
+    arm.rotation.z = motion.armZ - lift * 0.18;
+    elbow.rotation.x = motion.elbowX - lift * 0.58;
+    p.userData.head.rotation.x = 0.04 + lift * 0.08;
+    if (progress >= 1) {
+      arm.rotation.set(motion.armX, 0, motion.armZ);
+      elbow.rotation.x = motion.elbowX;
+      p.userData.head.rotation.x = 0.04;
+      p.userData.actionMotion = null;
+    }
+  }
 
   /* ---------- cena ---------- */
   function create(el, o) {
@@ -276,7 +295,7 @@ const W = (() => {
     sun.shadow.mapSize.set(LOW ? 1024 : 2048, LOW ? 1024 : 2048); const sc = o.shadowSize ?? 14;
     Object.assign(sun.shadow.camera, { left: -sc, right: sc, top: sc, bottom: -sc, near: 1, far: 70 }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
     sun.target.position.set(...o.target); scene.add(sun); scene.add(sun.target);
-    const labels = [], ticks = [], v = new T.Vector3(); let sideW = 0;
+    const labels = [], ticks = [], motions = [], v = new T.Vector3(); let sideW = 0, activePerson = null;
     function resize() {
       const w = el.clientWidth || window.innerWidth, h = el.clientHeight || window.innerHeight;
       renderer.setSize(w, h); camera.aspect = w / h;
@@ -296,7 +315,12 @@ const W = (() => {
     function loop(now) {
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       if (tween) { tween.t = Math.min(1, tween.t + dt / 0.9); const e = 1 - Math.pow(1 - tween.t, 3); controls.target.lerpVectors(tween.fT, tween.tT, e); camera.position.lerpVectors(tween.fC, tween.tC, e); if (tween.t >= 1) tween = null; }
-      ticks.forEach(f => f(dt, now / 1000)); animPeople(now / 1000);
+      ticks.forEach(f => f(dt, now / 1000)); animPeople(now / 1000); if (activePerson) animatePerson(activePerson, dt);
+      for (let i = motions.length - 1; i >= 0; i--) {
+        const m = motions[i]; m.elapsed = Math.min(m.duration, m.elapsed + dt); const p = m.elapsed / m.duration; const eased = p * p * (3 - 2 * p);
+        m.object[m.key] = m.from + (m.to - m.from) * eased;
+        if (p >= 1) motions.splice(i, 1);
+      }
       controls.update(); if (!paused) renderer.render(scene, camera);
       const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
       labels.forEach(L => {
@@ -338,6 +362,18 @@ const W = (() => {
     const ctx = {
       T, scene, camera, renderer, controls, el, ov, sun, focus, home, hideLabels: false,
       tick: f => ticks.push(f), onPick: cb => pickCbs.push(cb), pause: p => { paused = p; },
+      animate(object, path, to, duration = 0.8) {
+        const [parentKey, key] = path.split('.'); const target = key ? object?.[parentKey] : object;
+        if (!target || !(key || parentKey in target)) return;
+        const prop = key || parentKey;
+        motions.push({ object: target, key: prop, from: target[prop], to, duration: Math.max(0.1, duration), elapsed: 0 });
+      },
+      perform(person) {
+        if (!person?.userData.arms?.[1]) return;
+        activePerson = person;
+        const arm = person.userData.arms[1];
+        person.userData.actionMotion = { duration: 0.9, elapsed: 0, armX: arm.rotation.x, armZ: arm.rotation.z, elbowX: arm.userData.elbow.rotation.x };
+      },
       hit(group, id) {
         group.traverse(m => { if (m.isMesh && m.material) m.material = m.material.clone(); });
         group.userData.hit = id; (hits[id] = hits[id] || []).push(group); if (!group.parent) scene.add(group); return group;

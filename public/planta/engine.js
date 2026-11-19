@@ -32,6 +32,7 @@
   function add(k, msg, c) { G.log.push({ k, msg, at: clock() }); if (c && (k === 'crit' || k === 'mod')) G.fails[c] = true; if (k === 'crit') G.score -= 20; if (k === 'mod') G.score -= 5; G.score = Math.max(0, G.score); hud(); }
   const api = {
     ok: (m) => add('ok', m), info: (m) => add('info', m), mod: (m, c) => add('mod', m, c),
+    animate: (object, path, to, duration) => ctx.animate(object, path, to, duration),
     crit(title, text, c) { add('crit', title + ': ' + text.split('.')[0] + '.', c); showCrit(title, text); return false; },
   };
   function avatar(who) {
@@ -91,7 +92,7 @@
   }
   function act(i) {
     const a = G._acts[i]; if (!a) return;
-    a.run(); render();
+    const result = a.run(); if (result !== false) ctx.perform(R.me); render();
     if (!G.cen && SA.cen.when(S) && !$('#modal').classList.contains('on')) setTimeout(openCen, 700);
   }
 

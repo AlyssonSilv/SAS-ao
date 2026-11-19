@@ -122,7 +122,7 @@ const SAS = [
       if (id === 'chave') {
         A.push({ t: 'Desligar a chave Q1 do barramento', done: S.q1, run() {
           if (!S.down) return api.crit('Carga suspensa sem energia', 'Com o freio falhando, cortar a energia tira o controle da carga. Duas toneladas podem descer sem comando sobre quem estiver embaixo.', 'C2');
-          S.q1 = true; R.knob.rotation.z = -Math.PI / 2; R.lampMain.material.emissiveIntensity = 0.05; api.ok('Q1 desligada.');
+          S.q1 = true; api.animate(R.knob, 'rotation.z', -Math.PI / 2, 0.7); R.lampMain.material.emissiveIntensity = 0.05; api.ok('Q1 desligada.');
         } });
         A.push({ t: 'Bloquear a Q1 com cadeado e etiqueta', done: S.q1lock, dis: !S.q1, run() { S.q1lock = true; R.lockChave.visible = true; api.ok('Cadeado e etiqueta na Q1.'); } });
       }
@@ -138,7 +138,7 @@ const SAS = [
         } });
       }
       if (id === 'aux') {
-        A.push({ t: 'Desligar a QA-02', done: S.qa, run() { S.qa = true; R.lever.rotation.z = Math.PI / 2; R.lampCmd.material.emissiveIntensity = 0.05; api.ok('QA-02 desligada. Lâmpada de comando apagou.'); } });
+        A.push({ t: 'Desligar a QA-02', done: S.qa, run() { S.qa = true; api.animate(R.lever, 'rotation.z', Math.PI / 2, 0.7); R.lampCmd.material.emissiveIntensity = 0.05; api.ok('QA-02 desligada. Lâmpada de comando apagou.'); } });
         A.push({ t: 'Bloquear a QA-02 com cadeado e etiqueta', done: S.qalock, dis: !S.qa, run() { S.qalock = true; R.lockAux.visible = true; api.ok('Cadeado e etiqueta na QA-02.'); } });
       }
       if (id === 'caixa') A.push({ t: 'Chaves na caixa coletiva; cada executante aplica o seu cadeado', done: S.col, dis: !(S.q1lock && S.qalock), run() { S.col = true; R.boxLocks.forEach(l => l.visible = true); api.ok('Bloqueio coletivo com três cadeados.'); } });
@@ -196,7 +196,7 @@ const SAS = [
       }
       if (id === 'botoeira') A.push({ t: 'Apertar LIGA (teste de partida)', done: S.test, run() { testeLiga(S, R, api); } });
       const valve = (k, nome, wheel, cap) => {
-        A.push({ t: 'Fechar a ' + nome, done: S[k + 'C'], run() { S[k + 'C'] = true; wheel.rotation.z += Math.PI * 3; api.ok(nome[0].toUpperCase() + nome.slice(1) + ' fechada.'); } });
+        A.push({ t: 'Fechar a ' + nome, done: S[k + 'C'], run() { S[k + 'C'] = true; api.animate(wheel, 'rotation.z', wheel.rotation.z + Math.PI * 3, 1.8); api.ok(nome[0].toUpperCase() + nome.slice(1) + ' fechada.'); } });
         A.push({ t: 'Instalar capa bloqueadora com cadeado', done: S[k + 'L'], dis: !S[k + 'C'], run() { S[k + 'L'] = true; cap.visible = true; api.ok('Capa bloqueadora com cadeado na ' + nome + '.'); } });
       };
       if (id === 'vsuc') valve('suc', 'válvula de sucção V-201', R.wheelSuc, R.capSuc);
