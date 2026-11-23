@@ -302,7 +302,7 @@ const W = (() => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW ? 1 : 1.75));
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
     renderer.outputEncoding = T.sRGBEncoding; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = o.exposure ?? 0.78;
-    renderer.domElement.setAttribute('aria-label', 'Cena 3D interativa. Arraste para girar ou, no modo mover câmera, arraste para deslocar a vista. Use o botão direito para deslocar e a roda do mouse para aproximar ou afastar.');
+    renderer.domElement.setAttribute('aria-label', 'Cena 3D interativa. Arraste para girar ou, no modo mover câmera, arraste para deslocar a vista. Use o botão direito ou as setas do teclado para deslocar e a roda do mouse para aproximar ou afastar.');
     renderer.domElement.tabIndex = 0;
     el.appendChild(renderer.domElement);
     const ov = document.createElement('div'); ov.className = 'v-ov'; el.appendChild(ov);
@@ -312,6 +312,7 @@ const W = (() => {
     const controls = new T.OrbitControls(camera, renderer.domElement);
     controls.target.set(...o.target); controls.enableDamping = true; controls.dampingFactor = 0.075; controls.enablePan = true;
     controls.rotateSpeed = 0.72; controls.panSpeed = 0.78; controls.zoomSpeed = 0.82; controls.screenSpacePanning = true;
+    controls.listenToKeyEvents(renderer.domElement);
     controls.maxPolarAngle = o.maxPolar ?? 1.45; controls.minDistance = o.minD ?? 3; controls.maxDistance = o.maxD ?? 26;
     scene.add(new T.HemisphereLight(o.sky ?? 0xbcc8d6, o.gnd ?? 0x3a332c, o.hemi ?? 0.34));
     const sun = new T.DirectionalLight(o.sunColor ?? 0xffe2bd, o.sunI ?? 2.35); sun.position.set(...(o.sun ?? [10, 16, 6])); sun.castShadow = true;
