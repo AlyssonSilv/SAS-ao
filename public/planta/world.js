@@ -117,7 +117,7 @@ const W = (() => {
 
   /* ---------- materiais ---------- */
   const envI = { v: 0.55 };
-  function std(o) { const m = new T.MeshStandardMaterial(o); m.envMapIntensity = o.envI ?? envI.v; return m; }
+  function std(o) { const { envI: intensity, ...options } = o; const m = new T.MeshStandardMaterial(options); m.envMapIntensity = intensity ?? envI.v; return m; }
   const MAT = {
     concrete: (rep = [8, 8], tint, seed) => { const s = concreteSet(tint, seed); return std({ map: tex(s.map, rep), roughnessMap: tex(s.rough, rep, false), normalMap: tex(s.normal, rep, false), normalScale: new T.Vector2(0.6, 0.6), roughness: 1, metalness: 0 }); },
     paint: (color, o = {}) => { const s = paintSet(color, o.wear ?? 0.5, o.seed ?? 3); const rep = o.rep || [1, 1]; return std({ map: tex(s.map, rep), roughnessMap: tex(s.rough, rep, false), normalMap: tex(s.normal, rep, false), normalScale: new T.Vector2(0.5, 0.5), roughness: o.rough ?? 0.9, metalness: o.metal ?? 0.25, side: o.side ?? T.FrontSide }); },
@@ -247,7 +247,7 @@ const W = (() => {
     const rim = torus(0.13, 0.008, helmM); rim.rotation.x = Math.PI / 2; rim.scale.set(1, 1.12, 1); rim.position.y = 0.03; head.add(rim);
     const strap = torus(0.095, 0.004, MAT.flat(0x222222), Math.PI); strap.rotation.set(0, Math.PI / 2, Math.PI); strap.position.set(0, -0.02, 0); head.add(strap);
     head.rotation.x = 0.04; head.rotation.y = o.look ?? 0;
-    g.userData.arms = arms; g.userData.hands = hands; g.userData.head = head;
+    g.userData.arms = arms; g.userData.hands = hands; g.userData.head = head; g.userData.legs = legs;
     // respiração e olhar leve
     g.userData.ph = Math.random() * 6;
     g.onBeforeRender = () => { };
@@ -261,17 +261,30 @@ const W = (() => {
     const motion = p.userData.actionMotion;
     motion.elapsed = Math.min(motion.duration, motion.elapsed + dt);
     const progress = motion.elapsed / motion.duration;
-    const lift = Math.sin(progress * Math.PI);
+    const reach = Math.sin(progress * Math.PI);
     const arm = p.userData.arms[1];
     const elbow = arm.userData.elbow;
-    arm.rotation.x = motion.armX + lift * 0.78;
-    arm.rotation.z = motion.armZ - lift * 0.18;
-    elbow.rotation.x = motion.elbowX - lift * 0.58;
-    p.userData.head.rotation.x = 0.04 + lift * 0.08;
+    const hand = p.userData.hands[1];
+    const legs = p.userData.legs;
+    arm.rotation.x = motion.armX + reach * 0.62;
+    arm.rotation.z = motion.armZ - reach * 0.14;
+    elbow.rotation.x = motion.elbowX - reach * 0.72;
+    hand.rotation.x = motion.handX + reach * 0.12;
+    p.userData.head.rotation.x = motion.headX + reach * 0.11;
+    p.userData.head.rotation.y = motion.headY - reach * 0.08;
+    p.position.y = motion.positionY + reach * 0.018;
+    p.rotation.x = motion.rootX + reach * 0.025;
+    legs[0].rotation.z = motion.legLeftZ - reach * 0.025;
+    legs[1].rotation.z = motion.legRightZ + reach * 0.025;
     if (progress >= 1) {
-      arm.rotation.set(motion.armX, 0, motion.armZ);
+      arm.rotation.set(motion.armX, motion.armY, motion.armZ);
       elbow.rotation.x = motion.elbowX;
-      p.userData.head.rotation.x = 0.04;
+      hand.rotation.x = motion.handX;
+      p.userData.head.rotation.set(motion.headX, motion.headY, motion.headZ);
+      p.position.y = motion.positionY;
+      p.rotation.x = motion.rootX;
+      legs[0].rotation.z = motion.legLeftZ;
+      legs[1].rotation.z = motion.legRightZ;
       p.userData.actionMotion = null;
     }
   }
@@ -282,16 +295,19 @@ const W = (() => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW ? 1 : 1.75));
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
     renderer.outputEncoding = T.sRGBEncoding; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = o.exposure ?? 0.78;
+    renderer.domElement.setAttribute('aria-label', 'Cena 3D interativa. Arraste para girar, use o botão direito para deslocar e a roda do mouse para aproximar ou afastar.');
+    renderer.domElement.tabIndex = 0;
     el.appendChild(renderer.domElement);
     const ov = document.createElement('div'); ov.className = 'v-ov'; el.appendChild(ov);
     const scene = new T.Scene(); const bg = new T.Color(o.bg ?? 0x1b2026); scene.background = bg; scene.fog = new T.Fog(o.fog ?? o.bg ?? 0x1b2026, o.fogNear ?? 22, o.fogFar ?? 75);
     const pm = new T.PMREMGenerator(renderer); scene.environment = pm.fromScene(new T.RoomEnvironment(), 0.04).texture; envI.v = o.env ?? 0.42;
     const camera = new T.PerspectiveCamera(o.fov ?? 40, 1.6, 0.1, 300); camera.position.set(...o.cam);
     const controls = new T.OrbitControls(camera, renderer.domElement);
-    controls.target.set(...o.target); controls.enableDamping = true; controls.dampingFactor = 0.08; controls.enablePan = false;
+    controls.target.set(...o.target); controls.enableDamping = true; controls.dampingFactor = 0.075; controls.enablePan = true;
+    controls.rotateSpeed = 0.72; controls.panSpeed = 0.78; controls.zoomSpeed = 0.82; controls.screenSpacePanning = false;
     controls.maxPolarAngle = o.maxPolar ?? 1.45; controls.minDistance = o.minD ?? 3; controls.maxDistance = o.maxD ?? 26;
-    scene.add(new T.HemisphereLight(o.sky ?? 0xbcc8d6, o.gnd ?? 0x3a332c, o.hemi ?? 0.28));
-    const sun = new T.DirectionalLight(o.sunColor ?? 0xffe2bd, o.sunI ?? 3.0); sun.position.set(...(o.sun ?? [10, 16, 6])); sun.castShadow = true;
+    scene.add(new T.HemisphereLight(o.sky ?? 0xbcc8d6, o.gnd ?? 0x3a332c, o.hemi ?? 0.34));
+    const sun = new T.DirectionalLight(o.sunColor ?? 0xffe2bd, o.sunI ?? 2.35); sun.position.set(...(o.sun ?? [10, 16, 6])); sun.castShadow = true;
     sun.shadow.mapSize.set(LOW ? 1024 : 2048, LOW ? 1024 : 2048); const sc = o.shadowSize ?? 14;
     Object.assign(sun.shadow.camera, { left: -sc, right: sc, top: sc, bottom: -sc, near: 1, far: 70 }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
     sun.target.position.set(...o.target); scene.add(sun); scene.add(sun.target);
@@ -348,20 +364,37 @@ const W = (() => {
     }
     let hover = null, lastMove = 0;
     function setGlow(id, on) { (hits[id] || []).forEach(g => g.traverse(m => { if (m.isMesh && m.material && m.material.emissive) { if (on) { m.userData.e0 = m.userData.e0 ?? m.material.emissive.getHex(); m.material.emissive.setHex(0x3a4f66); } else if (m.userData.e0 !== undefined) m.material.emissive.setHex(m.userData.e0); } })); }
+    let dragging = false;
     renderer.domElement.addEventListener('pointermove', e => {
+      if (dragging) return;
       const n = performance.now(); if (n - lastMove < 60) return; lastMove = n;
       const id = pickAt(e); if (id !== hover) { if (hover) setGlow(hover, false); hover = id; if (id) setGlow(id, true); renderer.domElement.style.cursor = id ? 'pointer' : 'grab'; ctx.onHover && ctx.onHover(id); }
     });
     renderer.domElement.addEventListener('pointerleave', () => { if (hover) setGlow(hover, false); hover = null; ctx.onHover && ctx.onHover(null); });
-    renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+    renderer.domElement.addEventListener('pointerdown', e => {
+      tween = null;
+      dragging = e.button === 0 || e.button === 2;
+      down = e.button === 0 ? [e.clientX, e.clientY] : null;
+      renderer.domElement.style.cursor = e.button === 2 ? 'move' : 'grabbing';
+    });
     renderer.domElement.addEventListener('pointerup', e => {
-      if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
+      const shouldPick = down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) <= 6;
+      down = null; dragging = false;
+      renderer.domElement.style.cursor = hover ? 'pointer' : 'grab';
+      if (!shouldPick) return;
       const id = pickAt(e); pickCbs.forEach(cb => cb(id, e));
     });
+    renderer.domElement.addEventListener('pointercancel', () => { down = null; dragging = false; renderer.domElement.style.cursor = 'grab'; });
     renderer.domElement.style.cursor = 'grab';
     const ctx = {
       T, scene, camera, renderer, controls, el, ov, sun, focus, home, hideLabels: false,
       tick: f => ticks.push(f), onPick: cb => pickCbs.push(cb), pause: p => { paused = p; },
+      zoom(factor) {
+        const target = controls.target.clone();
+        const offset = camera.position.clone().sub(target);
+        offset.setLength(T.MathUtils.clamp(offset.length() * factor, controls.minDistance, controls.maxDistance));
+        tween = { t: 0, fT: target, tT: target, fC: camera.position.clone(), tC: target.clone().add(offset) };
+      },
       animate(object, path, to, duration = 0.8) {
         const [parentKey, key] = path.split('.'); const target = key ? object?.[parentKey] : object;
         if (!target || !(key || parentKey in target)) return;
@@ -372,7 +405,24 @@ const W = (() => {
         if (!person?.userData.arms?.[1]) return;
         activePerson = person;
         const arm = person.userData.arms[1];
-        person.userData.actionMotion = { duration: 0.9, elapsed: 0, armX: arm.rotation.x, armZ: arm.rotation.z, elbowX: arm.userData.elbow.rotation.x };
+        const head = person.userData.head;
+        const legs = person.userData.legs;
+        person.userData.actionMotion = {
+          duration: 1.25,
+          elapsed: 0,
+          armX: arm.rotation.x,
+          armY: arm.rotation.y,
+          armZ: arm.rotation.z,
+          elbowX: arm.userData.elbow.rotation.x,
+          handX: person.userData.hands[1].rotation.x,
+          headX: head.rotation.x,
+          headY: head.rotation.y,
+          headZ: head.rotation.z,
+          positionY: person.position.y,
+          rootX: person.rotation.x,
+          legLeftZ: legs[0].rotation.z,
+          legRightZ: legs[1].rotation.z,
+        };
       },
       hit(group, id) {
         group.traverse(m => { if (m.isMesh && m.material) m.material = m.material.clone(); });

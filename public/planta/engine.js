@@ -205,8 +205,10 @@
     };
   }
 
-  $('#tools').innerHTML = `<button class="tb" id="home">Vista inicial</button><span class="tb" style="pointer-events:none">Arraste para girar · role para aproximar</span>`;
+  $('#tools').innerHTML = `<button class="tb" id="home" aria-label="Restaurar vista inicial" title="Restaurar vista inicial">Vista inicial</button><div class="zoom-controls" aria-label="Controles de zoom"><button class="tb tb-icon" id="zoom-out" aria-label="Afastar a câmera" title="Afastar">−</button><button class="tb tb-icon" id="zoom-in" aria-label="Aproximar a câmera" title="Aproximar">+</button></div><span class="tb tb-help">Arraste para girar · botão direito para mover · roda para zoom</span>`;
   $('#home').onclick = () => ctx.home();
+  $('#zoom-out').onclick = () => ctx.zoom(1.22);
+  $('#zoom-in').onclick = () => ctx.zoom(0.82);
   $('#eyebrow').textContent = `SA${SA.id} · ${SA.area} · ${SA.hora}`;
   $('#title').textContent = SA.titulo; $('#foco').textContent = SA.foco;
   hud(); render(); ctx.resize();

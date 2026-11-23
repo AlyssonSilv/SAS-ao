@@ -29,7 +29,15 @@ export function PlantaShell({ markup, simulation = false }: PlantaShellProps) {
 
     root.innerHTML = markup
     const scripts = simulation ? simulationScripts : dashboardScripts
-    const loadOnce = new Set(['/planta/sa-data.js', '/planta/world.js', '/planta/scenes.js'])
+    const loadOnce = new Set([
+      '/planta/vendor/three.min.js',
+      '/planta/vendor/OrbitControls.js',
+      '/planta/vendor/RoomEnvironment.js',
+      '/planta/vendor/RoundedBoxGeometry.js',
+      '/planta/world.js',
+      '/planta/scenes.js',
+      '/planta/sa-data.js',
+    ])
     const browserWindow = window as Window & { __plantaScriptLoads?: Map<string, Promise<void>> }
     const scriptLoads = browserWindow.__plantaScriptLoads ??= new Map<string, Promise<void>>()
 
