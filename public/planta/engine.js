@@ -92,7 +92,7 @@
   }
   function act(i) {
     const a = G._acts[i]; if (!a) return;
-    const result = a.run(); if (result !== false) ctx.perform(R.me); render();
+    const result = a.run(); if (result !== false) ctx.perform(R.me, R.anchors[G.sel]); render();
     if (!G.cen && SA.cen.when(S) && !$('#modal').classList.contains('on')) setTimeout(openCen, 700);
   }
 
@@ -205,7 +205,15 @@
     };
   }
 
-  $('#tools').innerHTML = `<button class="tb" id="home" aria-label="Restaurar vista inicial" title="Restaurar vista inicial">Vista inicial</button><div class="zoom-controls" aria-label="Controles de zoom"><button class="tb tb-icon" id="zoom-out" aria-label="Afastar a câmera" title="Afastar">−</button><button class="tb tb-icon" id="zoom-in" aria-label="Aproximar a câmera" title="Aproximar">+</button></div><span class="tb tb-help">Arraste para girar · botão direito para mover · roda para zoom</span>`;
+  $('#tools').innerHTML = `<button class="tb" id="home" aria-label="Restaurar vista inicial" title="Restaurar vista inicial">Vista inicial</button><button class="tb" id="camera-mode" aria-pressed="false" title="Arraste para mover a câmera sem girar a cena">Mover câmera</button><div class="zoom-controls" aria-label="Controles de zoom"><button class="tb tb-icon" id="zoom-out" aria-label="Afastar a câmera" title="Afastar">−</button><button class="tb tb-icon" id="zoom-in" aria-label="Aproximar a câmera" title="Aproximar">+</button></div><span class="tb tb-help">Arraste para girar · ative Mover câmera para deslocar · roda para zoom</span>`;
+  let panMode = false;
+  $('#camera-mode').onclick = () => {
+    panMode = !panMode;
+    ctx.setPanMode(panMode);
+    $('#camera-mode').setAttribute('aria-pressed', String(panMode));
+    $('#camera-mode').textContent = panMode ? 'Girar câmera' : 'Mover câmera';
+    $('#camera-mode').title = panMode ? 'Arraste para girar a cena' : 'Arraste para mover a câmera sem girar a cena';
+  };
   $('#home').onclick = () => ctx.home();
   $('#zoom-out').onclick = () => ctx.zoom(1.22);
   $('#zoom-in').onclick = () => ctx.zoom(0.82);

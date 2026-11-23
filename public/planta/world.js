@@ -261,12 +261,19 @@ const W = (() => {
     const motion = p.userData.actionMotion;
     motion.elapsed = Math.min(motion.duration, motion.elapsed + dt);
     const progress = motion.elapsed / motion.duration;
-    const reach = Math.sin(progress * Math.PI);
+    const walkProgress = Math.min(1, progress / 0.66);
+    const walkEase = walkProgress * walkProgress * (3 - 2 * walkProgress);
+    const walkSwing = Math.sin(walkProgress * Math.PI * 4) * (1 - walkProgress);
+    const reachProgress = Math.max(0, Math.min(1, (progress - 0.58) / 0.42));
+    const reach = Math.sin(reachProgress * Math.PI);
     const arm = p.userData.arms[1];
     const elbow = arm.userData.elbow;
     const hand = p.userData.hands[1];
     const legs = p.userData.legs;
-    arm.rotation.x = motion.armX + reach * 0.62;
+    p.position.x = motion.positionX + (motion.toX - motion.positionX) * walkEase;
+    p.position.z = motion.positionZ + (motion.toZ - motion.positionZ) * walkEase;
+    p.rotation.y = motion.rotationY + motion.rotationDelta * walkEase;
+    arm.rotation.x = motion.armX + walkSwing * 0.28 + reach * 0.62;
     arm.rotation.z = motion.armZ - reach * 0.14;
     elbow.rotation.x = motion.elbowX - reach * 0.72;
     hand.rotation.x = motion.handX + reach * 0.12;
@@ -274,15 +281,15 @@ const W = (() => {
     p.userData.head.rotation.y = motion.headY - reach * 0.08;
     p.position.y = motion.positionY + reach * 0.018;
     p.rotation.x = motion.rootX + reach * 0.025;
-    legs[0].rotation.z = motion.legLeftZ - reach * 0.025;
-    legs[1].rotation.z = motion.legRightZ + reach * 0.025;
+    legs[0].rotation.z = motion.legLeftZ + walkSwing * 0.48 - reach * 0.025;
+    legs[1].rotation.z = motion.legRightZ - walkSwing * 0.48 + reach * 0.025;
     if (progress >= 1) {
       arm.rotation.set(motion.armX, motion.armY, motion.armZ);
       elbow.rotation.x = motion.elbowX;
       hand.rotation.x = motion.handX;
       p.userData.head.rotation.set(motion.headX, motion.headY, motion.headZ);
-      p.position.y = motion.positionY;
-      p.rotation.x = motion.rootX;
+      p.position.set(motion.toX, motion.positionY, motion.toZ);
+      p.rotation.set(motion.rootX, motion.rotationY + motion.rotationDelta, motion.rootZ);
       legs[0].rotation.z = motion.legLeftZ;
       legs[1].rotation.z = motion.legRightZ;
       p.userData.actionMotion = null;
@@ -295,7 +302,7 @@ const W = (() => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW ? 1 : 1.75));
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
     renderer.outputEncoding = T.sRGBEncoding; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = o.exposure ?? 0.78;
-    renderer.domElement.setAttribute('aria-label', 'Cena 3D interativa. Arraste para girar, use o botão direito para deslocar e a roda do mouse para aproximar ou afastar.');
+    renderer.domElement.setAttribute('aria-label', 'Cena 3D interativa. Arraste para girar ou, no modo mover câmera, arraste para deslocar a vista. Use o botão direito para deslocar e a roda do mouse para aproximar ou afastar.');
     renderer.domElement.tabIndex = 0;
     el.appendChild(renderer.domElement);
     const ov = document.createElement('div'); ov.className = 'v-ov'; el.appendChild(ov);
@@ -304,7 +311,7 @@ const W = (() => {
     const camera = new T.PerspectiveCamera(o.fov ?? 40, 1.6, 0.1, 300); camera.position.set(...o.cam);
     const controls = new T.OrbitControls(camera, renderer.domElement);
     controls.target.set(...o.target); controls.enableDamping = true; controls.dampingFactor = 0.075; controls.enablePan = true;
-    controls.rotateSpeed = 0.72; controls.panSpeed = 0.78; controls.zoomSpeed = 0.82; controls.screenSpacePanning = false;
+    controls.rotateSpeed = 0.72; controls.panSpeed = 0.78; controls.zoomSpeed = 0.82; controls.screenSpacePanning = true;
     controls.maxPolarAngle = o.maxPolar ?? 1.45; controls.minDistance = o.minD ?? 3; controls.maxDistance = o.maxD ?? 26;
     scene.add(new T.HemisphereLight(o.sky ?? 0xbcc8d6, o.gnd ?? 0x3a332c, o.hemi ?? 0.34));
     const sun = new T.DirectionalLight(o.sunColor ?? 0xffe2bd, o.sunI ?? 2.35); sun.position.set(...(o.sun ?? [10, 16, 6])); sun.castShadow = true;
@@ -401,14 +408,27 @@ const W = (() => {
         const prop = key || parentKey;
         motions.push({ object: target, key: prop, from: target[prop], to, duration: Math.max(0.1, duration), elapsed: 0 });
       },
-      perform(person) {
+      setPanMode(enabled) {
+        controls.mouseButtons.LEFT = enabled ? T.MOUSE.PAN : T.MOUSE.ROTATE;
+        controls.touches.ONE = enabled ? T.TOUCH.PAN : T.TOUCH.ROTATE;
+      },
+      perform(person, anchor) {
         if (!person?.userData.arms?.[1]) return;
         activePerson = person;
         const arm = person.userData.arms[1];
         const head = person.userData.head;
         const legs = person.userData.legs;
+        const [targetX, , targetZ] = anchor || [person.position.x, 0, person.position.z];
+        const dx = targetX - person.position.x;
+        const dz = targetZ - person.position.z;
+        const distance = Math.hypot(dx, dz);
+        const approach = Math.max(0, distance - 1.1);
+        const directionX = distance ? dx / distance : 0;
+        const directionZ = distance ? dz / distance : 0;
+        const targetRotation = distance > 0.15 ? Math.atan2(dx, dz) : person.rotation.y;
+        const rotationDelta = Math.atan2(Math.sin(targetRotation - person.rotation.y), Math.cos(targetRotation - person.rotation.y));
         person.userData.actionMotion = {
-          duration: 1.25,
+          duration: Math.max(1.35, Math.min(6, approach / 2.2)),
           elapsed: 0,
           armX: arm.rotation.x,
           armY: arm.rotation.y,
@@ -418,8 +438,15 @@ const W = (() => {
           headX: head.rotation.x,
           headY: head.rotation.y,
           headZ: head.rotation.z,
+          positionX: person.position.x,
           positionY: person.position.y,
+          positionZ: person.position.z,
+          toX: person.position.x + directionX * approach,
+          toZ: person.position.z + directionZ * approach,
+          rotationY: person.rotation.y,
+          rotationDelta,
           rootX: person.rotation.x,
+          rootZ: person.rotation.z,
           legLeftZ: legs[0].rotation.z,
           legRightZ: legs[1].rotation.z,
         };
